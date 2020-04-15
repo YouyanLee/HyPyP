@@ -9,6 +9,7 @@
 # python_version  : 3.7
 # ==============================================================================
 
+from collections import namedtuple
 import numpy as np
 import matplotlib.pylab as plt
 import mne
@@ -87,7 +88,14 @@ def statsCond(PSDs_task_normLog, epochs, n_permutations, alpha_bonferroni, alpha
         pos = np.concatenate((pos, cor), axis=0)
     pos = pos[1:]
 
-    return T_obs, p_values, H0, adj_p, T_obs_plot
+    statsCondTuple = namedtuple('statsCond', ['T_obs', 'p_values', 'H0', 'adj_p', 'T_obs_plot'])
+
+    return statsCondTuple(
+        T_obs=T_obs,
+        p_values=p_values,
+        H0=H0,
+        adj_p=adj_p,
+        T_obs_plot=T_obs_plot)
 
 
 def con_matrix(epochs, freqs_mean, draw=False):
@@ -146,6 +154,8 @@ def con_matrix(epochs, freqs_mean, draw=False):
 
     return ch_con, ch_con_freq
 
+
+MetaconnTuple = namedtuple('MetaconnTuple', ['metaconn', 'metaconn_freq'])
 
 def metaconn_matrix_2brains(electrodes, ch_con, freqs_mean, plot=False):
     """
@@ -219,7 +229,9 @@ def metaconn_matrix_2brains(electrodes, ch_con, freqs_mean, plot=False):
         plt.spy(metaconn_freq)
         plt.title("Meta-connectivity matrix")
 
-    return metaconn, metaconn_freq
+    return MetaconnTuple(
+        metaconn=metaconn,
+        metaconn_freq=metaconn_freq)
 
 
 def metaconn_matrix(electrodes, ch_con, freqs_mean):
@@ -284,7 +296,9 @@ def metaconn_matrix(electrodes, ch_con, freqs_mean):
     # vizualising the array
     plt.spy(metaconn_freq)
 
-    return metaconn, metaconn_freq
+    return MetaconnTuple(
+        metaconn=metaconn,
+        metaconn_freq=metaconn_freq)
 
 
 def statscondCluster(data, freqs_mean, ch_con_freq, tail, n_permutations, alpha):

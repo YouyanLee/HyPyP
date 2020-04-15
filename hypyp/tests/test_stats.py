@@ -3,12 +3,10 @@
 
 import os
 import random
-import numpy as np
 from time import time
+import numpy as np
 import mne
-from hypyp import stats
-from hypyp import utils
-from hypyp import analyses
+from hypyp import stats, utils, analyses
 
 
 def test_metaconn():
@@ -31,8 +29,9 @@ def test_metaconn():
     sensor_pairs = analyses.indexes_connectivity_interbrains(epoch_merge)
 
     # computing metaconn_freq and test it
-    metaconn, metaconn_freq = stats.metaconn_matrix_2brains(
+    metaconn_tuple = stats.metaconn_matrix_2brains(
         sensor_pairs, ch_con, frequencies)
+    metaconn_freq = metaconn_tuple.metaconn_freq
     # take a random ch_name:
     random.seed(20)  # Init the random number generator for reproducibility
     # n = random.randrange(0, 63)
@@ -43,7 +42,7 @@ def test_metaconn():
     # checking for each pair in which ch_name is,
     # whether ch_name linked himself
     # (in neighbouring frequencies also)
-    assert(metaconn_freq[n+tot, p] == metaconn_freq[n, p])
+    assert metaconn_freq[n+tot, p] == metaconn_freq[n, p]
     assert(metaconn_freq[n-tot, p] == metaconn_freq[n, p])
     assert(metaconn_freq[n+tot, p+tot] == metaconn_freq[n, p])
     assert(metaconn_freq[n-tot, p-tot] == metaconn_freq[n, p])
@@ -77,19 +76,21 @@ def test_intraCSD():
     frequencies = [11, 12, 13]
     data = np.array([epo1, epo1])
     now = time()
-    # pb time refered before assignement!!!!!!!!!!!!!!!!!
     coh = analyses.simple_corr(data, frequencies, mode='plv', epoch_wise=True,
                                time_resolved=True)
     now2 = time()
-    coh_mne, freqs, time, epoch, taper = mne.connectivity.spectral_connectivity(data=epo1,
-                                                                                method='plv',
-                                                                                mode='fourier',
-                                                                                indices=None,
-                                                                                sfreq=500,
-                                                                                fmin=11,
-                                                                                fmax=13,
-                                                                                faverage=True)
+    coh_mne, _, _, _, _ = mne.connectivity.spectral_connectivity(
+        data=epo1,
+        method='plv',
+        mode='fourier',
+        indices=None,
+        sfreq=500,
+        fmin=11,
+        fmax=13,
+        faverage=True)
+
     now3 = time()
+    # !! It seems very unlikely to have exact same time ...
     assert((int(now2) - int(now)) == (int(now3) - int(now2)))
     # inter seem to work, but test same time, same values. 
     # then test intra.
