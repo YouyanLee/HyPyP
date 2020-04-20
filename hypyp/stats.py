@@ -3,6 +3,7 @@
 
 """
 Statistical functions
+
 | Option | Description |
 | ------ | ----------- |
 | title           | stats.py |
@@ -20,7 +21,13 @@ from mne.channels import find_ch_connectivity
 from mne.stats import permutation_cluster_test
 
 
-def statsCond(PSDs_task_normLog: np.ndarray, epochs: mne.Epochs, n_permutations: int, alpha_bonferroni: float, alpha: float):
+def statsCond(
+    PSDs_task_normLog: np.ndarray,
+    epochs: mne.Epochs,
+    n_permutations: int,
+    alpha_bonferroni: float,
+    alpha: float,
+):
     """
     Computes statistical t test on Power Spectral Density values
     for a condition.
@@ -69,8 +76,9 @@ def statsCond(PSDs_task_normLog: np.ndarray, epochs: mne.Epochs, n_permutations:
     """
     # averaging across frequencies (compute stats only in ch space)
     power = np.mean(PSDs_task_normLog, axis=2)
-    T_obs, p_values, H0 = mne.stats.permutation_t_test(power, n_permutations,
-                                                       tail=0, n_jobs=1)
+    T_obs, p_values, H0 = mne.stats.permutation_t_test(
+        power, n_permutations, tail=0, n_jobs=1
+    )
     adj_p = mne.stats.bonferroni_correction(p_values, alpha=alpha_bonferroni)
 
     T_obs_plot = np.nan * np.ones_like(T_obs)
@@ -82,22 +90,21 @@ def statsCond(PSDs_task_normLog: np.ndarray, epochs: mne.Epochs, n_permutations:
 
     # getting sensors position
     pos = np.array([[0, 0]])
-    for i in range(0, len(epochs.info['ch_names'])):
-        cor = np.array([epochs.info['chs'][i]['loc'][0:2]])
+    for i in range(0, len(epochs.info["ch_names"])):
+        cor = np.array([epochs.info["chs"][i]["loc"][0:2]])
         pos = np.concatenate((pos, cor), axis=0)
     pos = pos[1:]
 
-    statsCondTuple = namedtuple('statsCond', ['T_obs', 'p_values', 'H0', 'adj_p', 'T_obs_plot'])
+    statsCondTuple = namedtuple(
+        "statsCond", ["T_obs", "p_values", "H0", "adj_p", "T_obs_plot"]
+    )
 
     return statsCondTuple(
-        T_obs=T_obs,
-        p_values=p_values,
-        H0=H0,
-        adj_p=adj_p,
-        T_obs_plot=T_obs_plot)
+        T_obs=T_obs, p_values=p_values, H0=H0, adj_p=adj_p, T_obs_plot=T_obs_plot
+    )
 
 
-def con_matrix(epochs: mne.Epochs, freqs_mean: list, draw: bool=False):
+def con_matrix(epochs: mne.Epochs, freqs_mean: list, draw: bool = False):
     """
     Computes a priori channels connectivity across space and frequencies.
 
@@ -119,8 +126,7 @@ def con_matrix(epochs: mne.Epochs, freqs_mean: list, draw: bool=False):
     """
 
     # creating channels connectivity matrix in space
-    ch_con, ch_names_con = find_ch_connectivity(epochs.info,
-                                                ch_type='eeg')
+    ch_con, ch_names_con = find_ch_connectivity(epochs.info, ch_type="eeg")
 
     ch_con_arr = ch_con.toarray()
 
@@ -128,11 +134,14 @@ def con_matrix(epochs: mne.Epochs, freqs_mean: list, draw: bool=False):
     # to take channels connectivity across neighboring frequencies into
     # account
     l_freq = len(freqs_mean)
-    init = np.zeros((l_freq*len(ch_names_con),
-                     l_freq*len(ch_names_con)))
-    for i in range(0, l_freq*len(ch_names_con)):
-        for p in range(0, l_freq*len(ch_names_con)):
-            if (p//len(ch_names_con) == i//len(ch_names_con)) or (p//len(ch_names_con) == i//len(ch_names_con) + 1) or (p//len(ch_names_con) == i//len(ch_names_con) - 1):
+    init = np.zeros((l_freq * len(ch_names_con), l_freq * len(ch_names_con)))
+    for i in range(0, l_freq * len(ch_names_con)):
+        for p in range(0, l_freq * len(ch_names_con)):
+            if (
+                (p // len(ch_names_con) == i // len(ch_names_con))
+                or (p // len(ch_names_con) == i // len(ch_names_con) + 1)
+                or (p // len(ch_names_con) == i // len(ch_names_con) - 1)
+            ):
                 init[i][p] = 1
 
     ch_con_mult = np.tile(ch_con_arr, (l_freq, l_freq))
@@ -148,14 +157,17 @@ def con_matrix(epochs: mne.Epochs, freqs_mean: list, draw: bool=False):
         plt.spy(ch_con_freq)
         plt.title("Meta-connectivity matrix")
 
-    con_matrixTuple = namedtuple('con_matrix', ['ch_con', 'ch_con_freq'])
+    con_matrixTuple = namedtuple("con_matrix", ["ch_con", "ch_con_freq"])
 
-    return con_matrixTuple(
-        ch_con=ch_con,
-        ch_con_freq=ch_con_freq)
+    return con_matrixTuple(ch_con=ch_con, ch_con_freq=ch_con_freq)
 
 
-def metaconn_matrix_2brains(electrodes: list, ch_con: scipy.sparse.csr_matrix, freqs_mean: list, plot: bool=False):
+def metaconn_matrix_2brains(
+    electrodes: list,
+    ch_con: scipy.sparse.csr_matrix,
+    freqs_mean: list,
+    plot: bool = False,
+):
     """
     Computes a priori connectivity across space and frequencies
     between pairs of sensors for which connectivity indices have
@@ -189,27 +201,32 @@ def metaconn_matrix_2brains(electrodes: list, ch_con: scipy.sparse.csr_matrix, f
           (len(electrodes)*len(freqs_mean), len(electrodes)*len(freqs_mean)).
     """
 
-    n = np.max(electrodes, axis=0)[0]+1
+    n = np.max(electrodes, axis=0)[0] + 1
     # n = 62
     metaconn = np.zeros((len(electrodes), len(electrodes)))
     for ne1, (e11, e12) in enumerate(electrodes):
         for ne2, (e21, e22) in enumerate(electrodes):
             # print(ne1,e11,e12,ne2,e21,e22)
             # considering no a priori connectivity between the 2 brains
-            metaconn[ne1, ne2] = (((ch_con[e11, e21]) and (ch_con[e12-n, e22-n])) or
-                                  ((ch_con[e11, e21]) and (e12 == e22)) or
-                                  ((ch_con[e12-n, e22-n]) and (e11 == e21)) or
-                                  ((e12 == e22) and (e11 == e21)))
+            metaconn[ne1, ne2] = (
+                ((ch_con[e11, e21]) and (ch_con[e12 - n, e22 - n]))
+                or ((ch_con[e11, e21]) and (e12 == e22))
+                or ((ch_con[e12 - n, e22 - n]) and (e11 == e21))
+                or ((e12 == e22) and (e11 == e21))
+            )
 
     # duplicating the array 'freqs_mean' times to take channels connectivity
     # across neighboring frequencies into account
     l_freq = len(freqs_mean)
 
-    init = np.zeros((l_freq*len(electrodes),
-                     l_freq*len(electrodes)))
-    for i in range(0, l_freq*len(electrodes)):
-        for p in range(0, l_freq*len(electrodes)):
-            if (p//len(electrodes) == i//len(electrodes)) or (p//len(electrodes) == i//len(electrodes) + 1) or (p//len(electrodes) == i//len(electrodes) - 1):
+    init = np.zeros((l_freq * len(electrodes), l_freq * len(electrodes)))
+    for i in range(0, l_freq * len(electrodes)):
+        for p in range(0, l_freq * len(electrodes)):
+            if (
+                (p // len(electrodes) == i // len(electrodes))
+                or (p // len(electrodes) == i // len(electrodes) + 1)
+                or (p // len(electrodes) == i // len(electrodes) - 1)
+            ):
                 init[i][p] = 1
 
     metaconn_mult = np.tile(metaconn, (l_freq, l_freq))
@@ -221,14 +238,16 @@ def metaconn_matrix_2brains(electrodes: list, ch_con: scipy.sparse.csr_matrix, f
         plt.spy(metaconn_freq)
         plt.title("Meta-connectivity matrix")
 
-    metaconn_matrix_2brainsTuple = namedtuple('metaconn_matrix_2brains', ['metaconn', 'metaconn_freq'])
+    metaconn_matrix_2brainsTuple = namedtuple(
+        "metaconn_matrix_2brains", ["metaconn", "metaconn_freq"]
+    )
 
-    return metaconn_matrix_2brainsTuple(
-        metaconn=metaconn,
-        metaconn_freq=metaconn_freq)
+    return metaconn_matrix_2brainsTuple(metaconn=metaconn, metaconn_freq=metaconn_freq)
 
 
-def metaconn_matrix(electrodes: list, ch_con: scipy.sparse.csr_matrix, freqs_mean: list):
+def metaconn_matrix(
+    electrodes: list, ch_con: scipy.sparse.csr_matrix, freqs_mean: list
+):
     """
     Computes a priori connectivity between pairs of sensors for which
     connectivity indices have been calculated, across space and frequencies
@@ -261,22 +280,27 @@ def metaconn_matrix(electrodes: list, ch_con: scipy.sparse.csr_matrix, freqs_mea
     for ne1, (e11, e12) in enumerate(electrodes):
         for ne2, (e21, e22) in enumerate(electrodes):
             # print(ne1,e11,e12,ne2,e21,e22)
-            metaconn[ne1, ne2] = (((ch_con[e11, e21]) and (ch_con[e12, e22])) or
-                                  ((ch_con[e11, e22]) and (ch_con[e12, e21])) or
-                                  ((ch_con[e11, e21]) and (e12 == e22)) or
-                                  ((ch_con[e11, e22]) and (e12 == e21)) or
-                                  ((ch_con[e12, e21]) and (e11 == e22)) or
-                                  ((ch_con[e12, e22]) and (e11 == e21)))
+            metaconn[ne1, ne2] = (
+                ((ch_con[e11, e21]) and (ch_con[e12, e22]))
+                or ((ch_con[e11, e22]) and (ch_con[e12, e21]))
+                or ((ch_con[e11, e21]) and (e12 == e22))
+                or ((ch_con[e11, e22]) and (e12 == e21))
+                or ((ch_con[e12, e21]) and (e11 == e22))
+                or ((ch_con[e12, e22]) and (e11 == e21))
+            )
 
     # duplicating the array 'freqs_mean' times to take channels connectivity
     # across neighboring frequencies into account
     l_freq = len(freqs_mean)
 
-    init = np.zeros((l_freq*len(electrodes),
-                     l_freq*len(electrodes)))
-    for i in range(0, l_freq*len(electrodes)):
-        for p in range(0, l_freq*len(electrodes)):
-            if (p//len(electrodes) == i//len(electrodes)) or (p//len(electrodes) == i//len(electrodes) + 1) or (p//len(electrodes) == i//len(electrodes) - 1):
+    init = np.zeros((l_freq * len(electrodes), l_freq * len(electrodes)))
+    for i in range(0, l_freq * len(electrodes)):
+        for p in range(0, l_freq * len(electrodes)):
+            if (
+                (p // len(electrodes) == i // len(electrodes))
+                or (p // len(electrodes) == i // len(electrodes) + 1)
+                or (p // len(electrodes) == i // len(electrodes) - 1)
+            ):
                 init[i][p] = 1
 
     metaconn_mult = np.tile(metaconn, (l_freq, l_freq))
@@ -285,14 +309,19 @@ def metaconn_matrix(electrodes: list, ch_con: scipy.sparse.csr_matrix, freqs_mea
     # vizualising the array
     plt.spy(metaconn_freq)
 
-    metaconn_matrixTuple = namedtuple('metaconn_matrix', ['metaconn', 'metaconn_freq'])
+    metaconn_matrixTuple = namedtuple("metaconn_matrix", ["metaconn", "metaconn_freq"])
 
-    return metaconn_matrixTuple(
-        metaconn=metaconn,
-        metaconn_freq=metaconn_freq)
+    return metaconn_matrixTuple(metaconn=metaconn, metaconn_freq=metaconn_freq)
 
 
-def statscondCluster(data: list, freqs_mean: list, ch_con_freq: scipy.sparse.csr_matrix, tail: int, n_permutations: int, alpha: float):
+def statscondCluster(
+    data: list,
+    freqs_mean: list,
+    ch_con_freq: scipy.sparse.csr_matrix,
+    tail: int,
+    n_permutations: int,
+    alpha: float,
+):
     """
     Computes cluster-level statistical permutation test, corrected with
     channels connectivity across space and frequencies.
@@ -330,11 +359,15 @@ def statscondCluster(data: list, freqs_mean: list, ch_con_freq: scipy.sparse.csr
     """
 
     # computing the cluster permutation t test
-    F_obs, clusters, cluster_p_values, H0 = permutation_cluster_test(data,
-                                                                     threshold=None,
-                                                                     n_permutations=n_permutations,
-                                                                     tail=tail, connectivity=ch_con_freq,
-                                                                     t_power=1, out_type='indices')
+    F_obs, clusters, cluster_p_values, H0 = permutation_cluster_test(
+        data,
+        threshold=None,
+        n_permutations=n_permutations,
+        tail=tail,
+        connectivity=ch_con_freq,
+        t_power=1,
+        out_type="indices",
+    )
     # t_power = 1 weights each location by its statistical score,
     # when set to 0 it gives a count of locations in each cluster
 
@@ -346,12 +379,16 @@ def statscondCluster(data: list, freqs_mean: list, ch_con_freq: scipy.sparse.csr
             F_obs_plot[i] = F_obs[i]
     F_obs_plot = np.nan_to_num(F_obs_plot)
 
-    statscondClusterTuple = namedtuple('statscondCluster', ['F_obs', 'clusters', 'cluster_p_values', 'H0', 'F_obs_plot'])
+    statscondClusterTuple = namedtuple(
+        "statscondCluster",
+        ["F_obs", "clusters", "cluster_p_values", "H0", "F_obs_plot"],
+    )
 
     return statscondClusterTuple(
         F_obs=F_obs,
         clusters=clusters,
         cluster_p_values=cluster_p_values,
         H0=H0,
-        F_obs_plot=F_obs_plot)
+        F_obs_plot=F_obs_plot,
+    )
 
