@@ -351,7 +351,7 @@ def compute_sync_test(complex_signal, mode, time_resolved=True):
                 this_s = s[this_epoch]
                 this_amp = amp[this_epoch]
                 dphi = _multiply_conjugate(this_c, this_s, time_resolved=time_resolved, transpose_axes=(0,2,1))
-                this_con = abs(dphi) / np.sqrt(np.einsum('ilm,imk->ilk', this_amp, this_amp.transpose((0, 2, 1))))
+                this_con = np.abs(dphi) / np.sqrt(np.einsum('ilm,imk->ilk', this_amp, this_amp.transpose((0, 2, 1))))
                 con += this_con
 
         elif mode is 'imagcoh':
@@ -539,7 +539,7 @@ def _icoh(X, Y, axis):
     X_phase = X/np.abs(X)
     Y_phase = Y/np.abs(Y)
 
-    iSxy = np.nansum(np.abs(X) * np.abs(Y) * np.sin(np.angle(X_phase) - np.angle(Y_phase)), axis)/X.shape[axis]
+    iSxy = np.imag(np.nansum(np.abs(X) * np.abs(Y) * np.exp(1j * (np.angle(X_phase) - np.angle(Y_phase))), axis))/X.shape[axis]
     Sxx = np.nansum(np.abs(X)**2, axis)/X.shape[axis]
     Syy = np.nansum(np.abs(Y)**2, axis)/X.shape[axis]
 
