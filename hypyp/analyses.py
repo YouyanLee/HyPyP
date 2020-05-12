@@ -363,7 +363,7 @@ def compute_sync_test(complex_signal, mode, time_resolved=True):
                 this_s = s[this_epoch]
                 this_amp = amp[this_epoch]
                 dphi = _multiply_conjugate(this_c, this_s, time_resolved=time_resolved, transpose_axes=(0, 2, 1))
-                this_con = np.imag(dphi) / np.sqrt(np.einsum('ilm,imk->ilk', this_amp, this_amp.transpose((0, 2, 1))))
+                this_con = np.abs(np.imag(dphi)) / np.sqrt(np.einsum('ilm,imk->ilk', this_amp, this_amp.transpose((0, 2, 1))))
                 con += this_con
 
         elif mode is 'proj':
@@ -405,17 +405,71 @@ def compute_sync_test(complex_signal, mode, time_resolved=True):
         con = con / n_epoch  # average over number of epochs
 
     # calculate all epochs at once, the only downside is that the disk may not have enough space
-    # TODO this can be easily implemented after we discuss this?
     else:
+        complex_signal = complex_signal.transpose((1, 3, 0, 2, 4)).reshape(n_epoch, n_freq, 2 * n_ch, n_samp)
+        transpose_axes = (0, 1, 3, 2)
         if mode is 'plv':
-            complex_signal = complex_signal.transpose((1, 3, 0, 2, 4)).reshape(n_epoch, n_freq, 2 * n_ch, n_samp)
             phase = complex_signal / np.abs(complex_signal)
             c = np.real(phase)
             s = np.imag(phase)
-            dphi = _multiply_conjugate(c, s, time_resolved=time_resolved, transpose_axes=(0, 1, 3, 2))
+            dphi = _multiply_conjugate(c, s, time_resolved=time_resolved, transpose_axes=transpose_axes)
             con = abs(dphi) / n_samp
 
+        elif mode is 'envelope':
+            env = np.abs(complex_signal)
+            mu_env = np.mean(env, axis=3).reshape(n_epoch, n_freq, 2 * n_ch, 1)
+            env = env - mu_env
+            con = np.einsum('nilm,nimk->nilk', env, env.transpose(transpose_axes)) / \
+                   np.sqrt(np.einsum('nil,nik->nilk', np.sum(env ** 2, axis=3), np.sum(env ** 2, axis=3)))
 
+        elif mode is 'power':
+            env = np.abs(complex_signal)**2
+            mu_env = np.mean(env, axis=3).reshape(n_epoch, n_freq, 2 * n_ch, 1)
+            env = env - mu_env
+            con = np.einsum('nilm,nimk->nilk', env, env.transpose(transpose_axes)) / \
+                   np.sqrt(np.einsum('nil,nik->nilk', np.sum(env ** 2, axis=3), np.sum(env ** 2, axis=3)))
+
+        elif mode is 'coh':
+            c = np.real(complex_signal)
+            s = np.imag(complex_signal)
+            amp = np.abs(complex_signal) ** 2
+            dphi = _multiply_conjugate(c, s, time_resolved=time_resolved, transpose_axes=transpose_axes)
+            con = np.abs(dphi) / np.sqrt(np.einsum('nilm,nimk->nilk', amp, amp.transpose(transpose_axes)))
+
+        elif mode is 'imagcoh':
+            c = np.real(complex_signal)
+            s = np.imag(complex_signal)
+            amp = np.abs(complex_signal) ** 2
+            dphi = _multiply_conjugate(c, s, time_resolved=time_resolved, transpose_axes=transpose_axes)
+            con = np.abs(np.imag(dphi)) / np.sqrt(np.einsum('nilm,nimk->nilk', amp, amp.transpose(transpose_axes)))
+
+        elif mode is 'proj':
+            c = np.real(complex_signal)
+            s = np.imag(complex_signal)
+            env = np.abs(complex_signal)
+            c_phase = np.real(complex_signal / env)
+            s_phase = np.imag(complex_signal / env)
+
+            formula = 'nilm,nimk->nilk'
+            productX = np.imag(np.einsum(formula, c, c_phase.transpose(transpose_axes)) + \
+                       np.einsum(formula, s, s_phase.transpose(transpose_axes)) + 1j * \
+                       (np.einsum(formula, c, s_phase.transpose(transpose_axes)) - \
+                        np.einsum(formula, s, c_phase.transpose(transpose_axes))))
+            productY = np.imag(np.einsum(formula, c_phase, c.transpose(transpose_axes)) +\
+                       np.einsum(formula, s_phase, s.transpose(transpose_axes)) + 1j *\
+                       (np.einsum(formula, c_phase, s.transpose(transpose_axes)) -\
+                        np.einsum(formula, s_phase, c.transpose(transpose_axes))))
+
+            con = (productX+productY)/2
+
+        elif mode is 'ccorr':
+            angle = np.angle(complex_signal)
+            mu_angle = circmean(angle, axis=3).reshape(n_epoch, n_freq, 2*n_ch, 1)
+            angle = np.sin(angle - mu_angle)
+
+            formula = 'nilm,nimk->nilk'
+            con = np.einsum(formula, angle, angle.transpose(transpose_axes)) / \
+                    np.sqrt(np.einsum('nil,nik->nilk', np.sum(angle ** 2, axis=3), np.sum(angle ** 2, axis=3)))
 
     return con
 
@@ -514,10 +568,8 @@ def _coh(X, Y, axis):
     Frontiers in Human Neuroscience 9 (January 19, 2016).
     https://doi.org/10.3389/fnhum.2015.00713.
     """
-    X_phase = X/np.abs(X)
-    Y_phase = Y/np.abs(Y)
 
-    Sxy = np.nansum(np.abs(X) * np.abs(Y) * np.exp(1j * (np.angle(X_phase) - np.angle(Y_phase))), axis)/X.shape[axis]
+    Sxy = np.nansum(X*Y.conj(), axis)/X.shape[axis]
     Sxx = np.nansum(np.abs(X)**2, axis)/X.shape[axis]
     Syy = np.nansum(np.abs(Y)**2, axis)/X.shape[axis]
 
@@ -536,14 +588,11 @@ def _icoh(X, Y, axis):
     iCoh = -----------------------------
                sqrt(A1^2 * A2^2)
     """
-    X_phase = X/np.abs(X)
-    Y_phase = Y/np.abs(Y)
-
-    iSxy = np.imag(np.nansum(np.abs(X) * np.abs(Y) * np.exp(1j * (np.angle(X_phase) - np.angle(Y_phase))), axis))/X.shape[axis]
+    iSxy = np.abs(np.imag(np.nansum(X*Y.conj(), axis))/X.shape[axis])
     Sxx = np.nansum(np.abs(X)**2, axis)/X.shape[axis]
     Syy = np.nansum(np.abs(Y)**2, axis)/X.shape[axis]
 
-    icoh = np.abs(iSxy)/(np.sqrt(Sxx*Syy))
+    icoh = iSxy/(np.sqrt(Sxx*Syy))
 
     return icoh
 
