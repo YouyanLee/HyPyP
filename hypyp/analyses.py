@@ -270,7 +270,7 @@ def compute_sync_new(complex_signal, mode, time_resolved=True):
         elif mode is 'proj':
             values = complex_signal
             for this_epoch in trange(n_epoch):
-                this_con = np.array([_proj_power_corr_simplified(values[0][this_epoch, idx1[i], :, :],
+                this_con = np.array([_proj_power_corr(values[0][this_epoch, idx1[i], :, :],
                                                       values[1][this_epoch, idx2[i], :, :], axis=1)
                                      for i in range(con_idx)])
                 con += this_con
@@ -351,7 +351,9 @@ def compute_sync_test(complex_signal, mode, time_resolved=True):
                 this_s = s[this_epoch]
                 this_amp = amp[this_epoch]
                 dphi = _multiply_conjugate(this_c, this_s, time_resolved=time_resolved, transpose_axes=(0,2,1))
-                this_con = np.abs(dphi) / np.sqrt(np.einsum('ilm,imk->ilk', this_amp, this_amp.transpose((0, 2, 1))))
+                this_con = np.abs(dphi) / np.sqrt(np.einsum('il,ik->ilk', np.nansum(this_amp, axis=2),
+                                                            np.nansum(this_amp, axis=2)))
+
                 con += this_con
 
         elif mode is 'imagcoh':
@@ -363,7 +365,8 @@ def compute_sync_test(complex_signal, mode, time_resolved=True):
                 this_s = s[this_epoch]
                 this_amp = amp[this_epoch]
                 dphi = _multiply_conjugate(this_c, this_s, time_resolved=time_resolved, transpose_axes=(0, 2, 1))
-                this_con = np.abs(np.imag(dphi)) / np.sqrt(np.einsum('ilm,imk->ilk', this_amp, this_amp.transpose((0, 2, 1))))
+                this_con = np.abs(np.imag(dphi)) / np.sqrt(np.einsum('il,ik->ilk', np.nansum(this_amp, axis=2),
+                                                            np.nansum(this_amp, axis=2)))
                 con += this_con
 
         elif mode is 'proj':
@@ -697,22 +700,6 @@ def _proj_power_corr(X, Y, axis):
 
     proj_corr = (np.nanmean(projX_norm * Y_abs_norm, axis) +
                  np.nanmean(projY_norm * X_abs_norm, axis)) / 2
-
-    return proj_corr
-
-def _proj_power_corr_simplified(X, Y, axis):
-    # compute power proj corr using two complex signals
-    # adapted from Georgios Michalareas' MATLAB script
-    X_abs = np.abs(X)
-    Y_abs = np.abs(Y)
-
-    X_phase = X / X_abs
-    Y_phase = Y / Y_abs
-
-    projX = np.imag(X * np.conjugate(Y_phase))
-    projY = np.imag(Y * np.conjugate(X_phase))
-
-    proj_corr = np.nanmean(projX + projY, axis) / 2
 
     return proj_corr
 
