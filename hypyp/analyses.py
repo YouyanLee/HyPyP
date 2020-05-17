@@ -166,11 +166,6 @@ def simple_corr(data, frequencies, mode, epoch_wise=True, time_resolved=True):
           'coh': coherence
           'imagcoh': imaginary coherence
           'proj': projected power correlation
-        epoch_wise: boolean
-          whether to compute epoch-to-epoch synchrony. default is True.
-          if False, complex values from epochs will be concatenated before
-          computing synchrony
-          if True, synchrony is computed from matched epochs
         time_resolved: boolean
           whether to collapse the time course, only effective when
           epoch_wise==True,
@@ -199,7 +194,7 @@ def simple_corr(data, frequencies, mode, epoch_wise=True, time_resolved=True):
     elif type(frequencies) == dict:
         values = compute_freq_bands(data, frequencies)
 
-    result = compute_sync(values, mode, epoch_wise, time_resolved)
+    result = compute_sync(values, mode, time_resolved)
 
     return result
 
@@ -261,24 +256,24 @@ def compute_sync(complex_signal, mode, time_resolved=True):
         dphi = _multiply_conjugate(c, s, transpose_axes=transpose_axes)
         con = np.abs(np.imag(dphi)) / np.sqrt(np.einsum('nil,nik->nilk', np.nansum(amp, axis=3),
                                                     np.nansum(amp, axis=3)))
-    elif mode.lower() is 'projpowercorr':
-        c = np.real(complex_signal)
-        s = np.imag(complex_signal)
-        env = np.abs(complex_signal)
-        c_phase = np.real(complex_signal / env)
-        s_phase = np.imag(complex_signal / env)
-
-        formula = 'nilm,nimk->nilk'
-        productX = np.imag(np.einsum(formula, c, c_phase.transpose(transpose_axes)) + \
-                   np.einsum(formula, s, s_phase.transpose(transpose_axes)) + 1j * \
-                   (np.einsum(formula, c, s_phase.transpose(transpose_axes)) - \
-                    np.einsum(formula, s, c_phase.transpose(transpose_axes))))
-        productY = np.imag(np.einsum(formula, c_phase, c.transpose(transpose_axes)) +\
-                   np.einsum(formula, s_phase, s.transpose(transpose_axes)) + 1j *\
-                   (np.einsum(formula, c_phase, s.transpose(transpose_axes)) -\
-                    np.einsum(formula, s_phase, c.transpose(transpose_axes))))
-
-        con = (productX+productY)/2
+    # elif mode.lower() is 'projpowercorr':
+    #     c = np.real(complex_signal)
+    #     s = np.imag(complex_signal)
+    #     env = np.abs(complex_signal)
+    #     c_phase = np.real(complex_signal / env)
+    #     s_phase = np.imag(complex_signal / env)
+    #
+    #     formula = 'nilm,nimk->nilk'
+    #     productX = np.imag(np.einsum(formula, c, c_phase.transpose(transpose_axes)) + \
+    #                np.einsum(formula, s, s_phase.transpose(transpose_axes)) + 1j * \
+    #                (np.einsum(formula, c, s_phase.transpose(transpose_axes)) - \
+    #                 np.einsum(formula, s, c_phase.transpose(transpose_axes))))
+    #     productY = np.imag(np.einsum(formula, c_phase, c.transpose(transpose_axes)) +\
+    #                np.einsum(formula, s_phase, s.transpose(transpose_axes)) + 1j *\
+    #                (np.einsum(formula, c_phase, s.transpose(transpose_axes)) -\
+    #                 np.einsum(formula, s_phase, c.transpose(transpose_axes))))
+    #
+    #     con = (productX+productY)/2
 
     elif mode.lower() is 'ccorr':
         angle = np.angle(complex_signal)
